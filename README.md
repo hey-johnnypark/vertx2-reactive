@@ -1,6 +1,6 @@
 # Vert.x simple reactive example
 
-Example project for creating a Vert.x module which contains a consumer and a producer. You can simulate a failure in the sink so the consumer stops consuming.  
+Example project for creating a Vert.x module which contains a consumer and a sink. You can simulate a failure in the sink so the consumer stops consuming.  
 
 Build and run:
 
