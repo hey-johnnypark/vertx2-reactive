@@ -31,7 +31,7 @@ public class SinkVerticle extends Verticle {
 			public void handle(Message<Boolean> event) {
 				works = event.body();
 				if (works) {
-					vertx.eventBus().send(EventBus.PRODUCER, true);
+					vertx.eventBus().send(EventBus.CONSUMER, true);
 				}
 			}
 

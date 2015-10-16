@@ -6,5 +6,5 @@ public class EventBus {
 
 	public static final String SINK_CONTROL = "sink.control";
 
-	public static final String PRODUCER = "producer";
+	public static final String CONSUMER = "consumer";
 }

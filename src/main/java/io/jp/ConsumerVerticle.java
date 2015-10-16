@@ -9,7 +9,7 @@ import org.vertx.java.platform.Verticle;
 
 
 @SuppressWarnings("rawtypes")
-public class ProducerVerticle extends Verticle {
+public class ConsumerVerticle extends Verticle {
 
 	private static long NOT_RUNNING = -1;
 
@@ -50,7 +50,7 @@ public class ProducerVerticle extends Verticle {
 	public void start() {
 		startConsuming();
 
-		vertx.eventBus().registerHandler(EventBus.PRODUCER, new Handler<Message<Boolean>>() {
+		vertx.eventBus().registerHandler(EventBus.CONSUMER, new Handler<Message<Boolean>>() {
 
 			public void handle(Message<Boolean> event) {
 				if (event.body()) {
