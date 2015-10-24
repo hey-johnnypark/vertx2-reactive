@@ -94,6 +94,11 @@
 			<version>${vertx.testtools.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-client</artifactId>
+			<version>0.98.14-hadoop2</version>
+		</dependency>
 
 		<!-- Add any other dependencies that you want packaged into your module 
 			(in the lib dir) here as 'compile' dependencies. Here is an example <dependency> 
