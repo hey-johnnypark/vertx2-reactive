@@ -6,7 +6,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.Put;
@@ -21,6 +25,30 @@ import io.jp.message.State;
 import io.jp.message.StateMessage;
 
 public class HbaseVerticle extends Verticle {
+
+	private class DataHandler implements Handler<Message<JsonObject>> {
+
+		@Override
+		public void handle(Message<JsonObject> data) {
+			JsonObject packet = data.body();
+			container.logger().info("Put: " + packet);
+			Put put = jsonToPut(packet);
+			try {
+				hbaseConn.getTable(TABLE).put(put);
+				data.reply(true);
+			} catch (Exception e) {
+				container.logger().error(e);
+				unRegister(this);
+				data.reply(false);
+				sendState(State.OFFLINE);
+				if (reconnectTimer == -1) {
+					reconnectTimer = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(10), new ReconnectHandler());
+				}
+				data.reply(e);
+			}
+		}
+
+	}
 
 	private static final AtomicInteger INSTANCE_ID = new AtomicInteger(0);
 
@@ -44,6 +72,7 @@ public class HbaseVerticle extends Verticle {
 				vertx.cancelTimer(reconnectTimer);
 				reconnectTimer = -1;
 				sendState(State.ONLINE);
+				register(new DataHandler());
 			} catch (IOException e) {
 				container.logger().error("Reconnect failed: ", e);
 			}
@@ -54,31 +83,24 @@ public class HbaseVerticle extends Verticle {
 	public void start(Future<Void> startedResult) {
 		try {
 			createConnection();
+
+			HTableDescriptor desc = new HTableDescriptor(TableName.valueOf(TABLE));
+			desc.addFamily(new HColumnDescriptor(CF));
+
+			HBaseAdmin admin = new HBaseAdmin(hbaseConn);
+			if (admin.tableExists(TABLE)) {
+				admin.disableTable(TABLE);
+				admin.deleteTable(TABLE);
+			}
+			admin.createTable(desc);
+			admin.close();
+			vertx.eventBus().registerHandler(EventBus.HBASE_PUT, new DataHandler());
 			sendState(State.ONLINE);
+			startedResult.setResult(null);
 		} catch (IOException e) {
 			container.logger().error(e);
 			startedResult.setFailure(e);
 		}
-		vertx.eventBus().registerHandler(EventBus.HBASE_PUT, new Handler<Message<JsonObject>>() {
-
-			@Override
-			public void handle(Message<JsonObject> data) {
-				JsonObject packet = data.body();
-				container.logger().info("Put: " + packet);
-				Put put = jsonToPut(packet);
-				try {
-					hbaseConn.getTable(TABLE).put(put);
-				} catch (Exception e) {
-					container.logger().error(e);
-					sendState(State.OFFLINE);
-					if (reconnectTimer == -1) {
-						reconnectTimer = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(10), new ReconnectHandler());
-					}
-					data.reply(e);
-				}
-			}
-
-		});
 
 	}
 
@@ -112,6 +134,14 @@ public class HbaseVerticle extends Verticle {
 
 	private void sendState(State state) {
 		vertx.eventBus().send("state", new StateMessage().withId(instanceId).withState(state));
+	}
+
+	private void register(DataHandler dataHandler) {
+		vertx.eventBus().registerHandler(EventBus.HBASE_PUT, dataHandler);
+	}
+
+	private void unRegister(DataHandler dataHandler) {
+		vertx.eventBus().unregisterHandler(EventBus.HBASE_PUT, dataHandler);
 	}
 
 }
