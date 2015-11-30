@@ -3,13 +3,16 @@ package io.jp;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.platform.Verticle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.json.JsonObject;
 
 @SuppressWarnings("rawtypes")
-public class ConsumerVerticle extends Verticle {
+public class ConsumerVerticle extends AbstractVerticle {
+
+	private static final Logger LOG = LoggerFactory.getLogger(ConsumerVerticle.class);
 
 	private static long NOT_RUNNING = -1;
 
@@ -17,21 +20,15 @@ public class ConsumerVerticle extends Verticle {
 
 	private static AtomicLong CNT = new AtomicLong();
 
-	private class ProducerHandler implements Handler<Long> {
-
-		@Override
-		public void handle(Long event) {
-			JsonObject payload = new JsonObject().putString("key", Long.toString(CNT.getAndIncrement()))
-					.putString("val", "foobar");
-			vertx.eventBus().send(EventBus.HBASE_PUT, payload);
-			container.logger().info("Sent " + payload);
-		}
-
-	}
-
 	private void startConsuming() {
 		if (periodicTimerId == NOT_RUNNING) {
-			periodicTimerId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(1), new ProducerHandler());
+			periodicTimerId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(1), event -> {
+				JsonObject payload = new JsonObject()
+						.put("key", Long.toString(CNT.getAndIncrement()))
+						.put("val", "foobar");
+				vertx.eventBus().send(EventBus.HBASE_PUT, payload);
+				LOG.info("Sent {}", payload);
+			});
 		}
 	}
 
@@ -45,19 +42,16 @@ public class ConsumerVerticle extends Verticle {
 	public void start() {
 		startConsuming();
 
-		vertx.eventBus().registerHandler(EventBus.CONSUMER_CONTROL, new Handler<Message<Boolean>>() {
-
-			public void handle(Message<Boolean> event) {
-				container.logger().info("Received control info: " + event.body());
-				if (event.body()) {
-					startConsuming();
-				} else {
-					stopConsuming();
-				}
+		vertx.eventBus().consumer(EventBus.CONSUMER_CONTROL, msg -> {
+			LOG.info("Received control info: {}", msg.body());
+			if ((boolean) msg.body()) {
+				startConsuming();
+			} else {
+				stopConsuming();
 			}
 
 		});
-		container.logger().info(getClass().getName() + " started");
+		LOG.info("{} started", getClass().getName());
 	}
 
 }

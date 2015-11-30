@@ -4,16 +4,20 @@ import javax.jms.Connection;
 import javax.jms.Destination;
 import javax.jms.Message;
 import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.vertx.java.core.Future;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.platform.Verticle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class JmsConsumerVerticle extends Verticle {
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.json.JsonObject;
+
+public class JmsConsumerVerticle extends AbstractVerticle {
+
+	private static final Logger LOG = LoggerFactory.getLogger(JmsConsumerVerticle.class);
 
 	private Connection connection;
 
@@ -26,27 +30,24 @@ public class JmsConsumerVerticle extends Verticle {
 			Session session = connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
 			Destination destination = session.createQueue("foobar");
 			MessageConsumer consumer = session.createConsumer(destination);
-			consumer.setMessageListener(new MessageListener() {
 
-				@Override
-				public void onMessage(Message message) {
-					try {
-						if (message instanceof TextMessage) {
-							JsonObject payload = new JsonObject(((TextMessage) message).getText());
-							vertx.eventBus().sendWithTimeout(EventBus.HBASE_PUT, payload, 1000L, ackHandler(message));
-						}
-					} catch (Exception e) {
-						e.printStackTrace();
+			consumer.setMessageListener(jmsMessage -> {
+				try {
+					if (jmsMessage instanceof TextMessage) {
+						JsonObject payload = new JsonObject(((TextMessage) jmsMessage).getText());
+						vertx.eventBus().send(EventBus.HBASE_PUT, payload, ackHandler(jmsMessage));
 					}
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
 			});
 
 			connection.start();
 		} catch (Exception e) {
-			startedResult.setFailure(e);
+			startedResult.fail(e);
 		}
-		container.logger().info("Started");
-		startedResult.setResult(null);
+		LOG.info("Started");
+		startedResult.complete();
 	}
 
 	@Override
@@ -54,7 +55,7 @@ public class JmsConsumerVerticle extends Verticle {
 		try {
 			connection.close();
 		} catch (Exception e) {
-			container.logger().error(e);
+			LOG.error("E", e);
 		}
 	}
 

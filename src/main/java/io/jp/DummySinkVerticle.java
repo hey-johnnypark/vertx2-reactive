@@ -2,14 +2,18 @@ package io.jp;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.platform.Verticle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.jp.message.State;
 import io.jp.message.StateMessage;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.Message;
 
-public class DummySinkVerticle extends Verticle {
+public class DummySinkVerticle extends AbstractVerticle {
+
+	private static final Logger LOG = LoggerFactory.getLogger(DummySinkVerticle.class);
 
 	private static final AtomicInteger INSTANCE_ID = new AtomicInteger(0);
 
@@ -17,44 +21,31 @@ public class DummySinkVerticle extends Verticle {
 
 	private boolean works = true;
 
-	private class SinkDataHandler implements Handler<Message<String>> {
-
-		@Override
-		public void handle(Message<String> event) {
-			try {
-				sink(event.body());
-			} catch (RuntimeException e) {
-				container.logger().info("Exception: ", e);
-				vertx.eventBus().unregisterHandler(EventBus.SINK_DATA, this);
-				sendState(State.OFFLINE);
-			}
-
-		}
-	}
-
 	@Override
 	public void start() {
 
-		container.logger().info("Started");
+		LOG.info("Started");
 
 		sendState(State.ONLINE);
 
-		final SinkDataHandler handler = new SinkDataHandler();
-		vertx.eventBus().registerHandler(EventBus.SINK_DATA, handler);
-
-		vertx.eventBus().registerHandler(EventBus.SINK_CONTROL, new Handler<Message<Boolean>>() {
-
-			@Override
-			public void handle(Message<Boolean> event) {
-				works = event.body();
-				if (works) {
-					vertx.eventBus().registerHandler(EventBus.SINK_DATA, handler);
-					sendState(State.ONLINE);
-				}
+		final Handler<Message<String>> handler = event -> {
+			try {
+				sink(event.body());
+			} catch (RuntimeException e) {
+				LOG.info("Exception: ", e);
+				sendState(State.OFFLINE);
 			}
+		};
 
+		vertx.eventBus().consumer(EventBus.SINK_DATA, handler);
+
+		vertx.eventBus().consumer(EventBus.SINK_CONTROL, event -> {
+			works = (boolean) event.body();
+			if (works) {
+				vertx.eventBus().consumer(EventBus.SINK_DATA, handler);
+				sendState(State.ONLINE);
+			}
 		});
-
 	}
 
 	private void sendState(State state) {
@@ -63,7 +54,7 @@ public class DummySinkVerticle extends Verticle {
 
 	private void sink(String message) {
 		if (works) {
-			container.logger().info(Thread.currentThread() + " -> Sent message to sink: " + message);
+			LOG.info("{} -> Sent message to sink: {}", Thread.currentThread(), message);
 		} else {
 			throw new RuntimeException("Cannot sent message I am not working correctly");
 		}

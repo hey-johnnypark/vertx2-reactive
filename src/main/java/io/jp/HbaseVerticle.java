@@ -15,29 +15,33 @@ import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.vertx.java.core.Future;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.platform.Verticle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.jp.message.State;
 import io.jp.message.StateMessage;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
 
-public class HbaseVerticle extends Verticle {
+public class HbaseVerticle extends AbstractVerticle {
+
+	private static final Logger LOG = LoggerFactory.getLogger(HbaseVerticle.class);
 
 	private class DataHandler implements Handler<Message<JsonObject>> {
 
 		@Override
 		public void handle(Message<JsonObject> data) {
 			JsonObject packet = data.body();
-			container.logger().info("Put: " + packet);
+			LOG.info("Put: {}", packet);
 			Put put = jsonToPut(packet);
 			try {
 				hbaseConn.getTable(TABLE).put(put);
 				data.reply(true);
 			} catch (Exception e) {
-				container.logger().error(e);
+				LOG.error("E: ", e);
 				unRegister(this);
 				data.reply(false);
 				sendState(State.OFFLINE);
@@ -74,7 +78,7 @@ public class HbaseVerticle extends Verticle {
 				sendState(State.ONLINE);
 				register(new DataHandler());
 			} catch (IOException e) {
-				container.logger().error("Reconnect failed: ", e);
+				LOG.error("Reconnect failed: ", e);
 			}
 		}
 	}
@@ -94,12 +98,12 @@ public class HbaseVerticle extends Verticle {
 			}
 			admin.createTable(desc);
 			admin.close();
-			vertx.eventBus().registerHandler(EventBus.HBASE_PUT, new DataHandler());
+			vertx.eventBus().consumer(EventBus.HBASE_PUT, new DataHandler());
 			sendState(State.ONLINE);
-			startedResult.setResult(null);
+			startedResult.complete();
 		} catch (IOException e) {
-			container.logger().error(e);
-			startedResult.setFailure(e);
+			LOG.error("E", e);
+			startedResult.fail(e);
 		}
 
 	}
@@ -124,7 +128,8 @@ public class HbaseVerticle extends Verticle {
 
 	private Put jsonToPut(JsonObject packet) {
 		Put put = new Put(Bytes.toBytes(String.format("%10s", packet.getString("key"))));
-		for (String key : packet.getFieldNames()) {
+
+		for (String key : packet.fieldNames()) {
 			if (key == "key")
 				continue;
 			put.add(CF, Bytes.toBytes(key), Bytes.toBytes(packet.getString(key)));
@@ -137,11 +142,11 @@ public class HbaseVerticle extends Verticle {
 	}
 
 	private void register(DataHandler dataHandler) {
-		vertx.eventBus().registerHandler(EventBus.HBASE_PUT, dataHandler);
+		vertx.eventBus().consumer(EventBus.HBASE_PUT, dataHandler);
 	}
 
 	private void unRegister(DataHandler dataHandler) {
-		vertx.eventBus().unregisterHandler(EventBus.HBASE_PUT, dataHandler);
+		vertx.eventBus().consumer(EventBus.HBASE_PUT, dataHandler);
 	}
 
 }

@@ -1,22 +1,22 @@
 package io.jp.message;
 
-import org.vertx.java.core.json.JsonObject;
+import io.vertx.core.json.JsonObject;
 
 public class StateMessage extends JsonObject {
 
 	private static final long serialVersionUID = -3623952659289872060L;
 
 	public StateMessage withId(int id) {
-		putNumber("id", id);
+		put("id", id);
 		return this;
 	}
 
 	public int getId() {
-		return getNumber("id").intValue();
+		return getInteger("id").intValue();
 	}
 
 	public StateMessage withState(State state) {
-		putString("state", state.name());
+		put("state", state.name());
 		return this;
 	}
 

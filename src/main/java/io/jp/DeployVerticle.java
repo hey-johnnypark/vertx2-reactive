@@ -8,15 +8,19 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.vertx.java.core.AsyncResult;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.platform.PlatformLocator;
-import org.vertx.java.platform.PlatformManager;
-import org.vertx.java.platform.Verticle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class DeployVerticle extends Verticle {
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonObject;
+
+public class DeployVerticle extends AbstractVerticle {
+
+	private static final Logger LOG = LoggerFactory.getLogger(DeployVerticle.class);
 
 	private Map<String, Object> deployMap = new HashMap<>();
 
@@ -40,10 +44,11 @@ public class DeployVerticle extends Verticle {
 		@Override
 		public void handle(AsyncResult<String> event) {
 			if (event.succeeded()) {
-				container.logger().info("Deployed verticle " + verticle);
+				LOG.info("Deployed verticle {}", verticle);
 				deployMap.put(event.result(), verticle);
+				
 			} else {
-				container.logger().error("While deploying verticle", event.cause());
+				LOG.error("While deploying verticle", event.cause());
 			}
 		}
 
@@ -60,7 +65,7 @@ public class DeployVerticle extends Verticle {
 		@Override
 		public void handle(AsyncResult<Void> event) {
 			if (event.succeeded()) {
-				container.logger().info("Undeployed verticle with id: " + deploymentId);
+				LOG.info("Undeployed verticle with id: {}", deploymentId);
 				deployMap.remove(deploymentId);
 			}
 		}
@@ -69,31 +74,33 @@ public class DeployVerticle extends Verticle {
 
 	@Override
 	public void start() {
-		container.deployVerticle(HttpVerticle.class.getName(), new DeployHandler(HttpVerticle.class.getName()));
-		container.deployVerticle(JmsProducerVerticle.class.getName(),
+
+		vertx.deployVerticle(HttpVerticle.class.getName(), new DeployHandler(HttpVerticle.class.getName()));
+
+		vertx.deployVerticle(JmsProducerVerticle.class.getName(),
 				new DeployHandler(JmsProducerVerticle.class.getName()));
 
-		vertx.eventBus().registerHandler(EventBus.DEPLOY_DEPLOY, new Handler<Message<String>>() {
+		vertx.eventBus().consumer(EventBus.DEPLOY_DEPLOY, new Handler<Message<String>>() {
 
 			@Override
 			public void handle(final Message<String> verticle) {
-				container.deployVerticle(verticle.body(), new DeployHandler(verticle.body()));
+				vertx.deployVerticle(verticle.body(), new DeployHandler(verticle.body()));
 			}
 		});
 
-		vertx.eventBus().registerHandler(EventBus.DEPLOY_UNDEPLOY, new Handler<Message<String>>() {
+		vertx.eventBus().consumer(EventBus.DEPLOY_UNDEPLOY, new Handler<Message<String>>() {
 
 			@Override
 			public void handle(Message<String> deploymentId) {
-				container.undeployVerticle(deploymentId.body(), new UndeployHandler(deploymentId.body()));
+				vertx.undeploy(deploymentId.body(), new UndeployHandler(deploymentId.body()));
 			}
 		});
 
-		vertx.eventBus().registerHandler(EventBus.DEPLOY_MAP, new Handler<Message<String>>() {
+		vertx.eventBus().consumer(EventBus.DEPLOY_MAP, new Handler<Message<String>>() {
 
 			@Override
 			public void handle(Message<String> deploymentId) {
-				container.logger().info("MAP: " + deployMap);
+				LOG.info("MAP: ", deployMap);
 				deploymentId.reply(new JsonObject(deployMap));
 			}
 		});
@@ -102,10 +109,7 @@ public class DeployVerticle extends Verticle {
 
 	public static void main(String[] args) throws MalformedURLException, IOException, InterruptedException {
 
-		URL url = new File(".", "target/classes").getCanonicalFile().toURL();
-		PlatformManager pm = PlatformLocator.factory.createPlatformManager();
-
-		pm.deployVerticle(DeployVerticle.class.getName(), new JsonObject(), new URL[] { url }, 1, null, null);
+		Vertx.vertx().deployVerticle(DeployVerticle.class.getName());
 
 		Thread.sleep(TimeUnit.MINUTES.toMillis(10));
 	}

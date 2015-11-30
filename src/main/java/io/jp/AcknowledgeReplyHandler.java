@@ -7,11 +7,12 @@ import javax.jms.Message;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vertx.java.core.AsyncResult;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.ReplyException;
 
-public class AcknowledgeReplyHandler implements Handler<AsyncResult<org.vertx.java.core.eventbus.Message<Boolean>>> {
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
+import io.vertx.core.eventbus.ReplyException;
+
+public class AcknowledgeReplyHandler implements Handler<AsyncResult<io.vertx.core.eventbus.Message<Boolean>>> {
 
 	private static Logger LOG = LoggerFactory.getLogger(AcknowledgeReplyHandler.class);
 
@@ -30,7 +31,7 @@ public class AcknowledgeReplyHandler implements Handler<AsyncResult<org.vertx.ja
 	}
 
 	@Override
-	public void handle(AsyncResult<org.vertx.java.core.eventbus.Message<Boolean>> result) {
+	public void handle(AsyncResult<io.vertx.core.eventbus.Message<Boolean>> result) {
 		if (result.cause() != null && result.cause() instanceof ReplyException) {
 			LOG.info("Request for message {} timed out: ", message);
 		} else if (result.failed()) {

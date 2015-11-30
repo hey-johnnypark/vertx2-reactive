@@ -1,80 +1,55 @@
 package io.jp;
 
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.eventbus.Message;
-import org.vertx.java.core.http.HttpServer;
-import org.vertx.java.core.http.HttpServerRequest;
-import org.vertx.java.core.http.RouteMatcher;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.platform.Verticle;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
 
-public class HttpVerticle extends Verticle {
+public class HttpVerticle extends AbstractVerticle {
 
 	@Override
 	public void start() {
-		HttpServer server = vertx.createHttpServer();
-		RouteMatcher routeMatcher = new RouteMatcher();
+		Router router = Router.router(vertx);
+		router.route().handler(BodyHandler.create());
+		router.get("/sink/on").handler(this::sinkOn);
+		router.get("/sink/off").handler(this::sinkOff);
+		router.get("/deploy/map").handler(this::deployMap);
+		router.get("/deploy/:verticle").handler(this::deploy);
+		router.get("/undeploy/:verticle").handler(this::undeploy);
+		vertx.createHttpServer().requestHandler(router::accept).listen(8080);
+	}
 
-		routeMatcher.get("/sink/on", new Handler<HttpServerRequest>() {
+	private void sinkOn(RoutingContext routingContext) {
+		vertx.eventBus().send(EventBus.SINK_CONTROL, true);
+		routingContext.response().setStatusCode(200);
+		routingContext.response().end();
+	}
 
-			@Override
-			public void handle(HttpServerRequest event) {
-				vertx.eventBus().send(EventBus.SINK_CONTROL, true);
-				event.response().setStatusCode(200);
-				event.response().end();
-			}
+	private void sinkOff(RoutingContext routingContext) {
+		vertx.eventBus().send(EventBus.SINK_CONTROL, false);
+		routingContext.response().setStatusCode(200);
+		routingContext.response().end();
+	}
+
+	private void deployMap(RoutingContext routingContext) {
+		vertx.eventBus().send(EventBus.DEPLOY_MAP, "", reply -> {
+			routingContext.response().setChunked(true);
+			routingContext.response().setStatusCode(200);
+			routingContext.response().write(reply.result().body().toString());
+			routingContext.response().end();
 		});
+	}
 
-		routeMatcher.get("/sink/off", new Handler<HttpServerRequest>() {
+	private void deploy(RoutingContext routingContext) {
+		vertx.eventBus().send(EventBus.DEPLOY_DEPLOY, routingContext.request().params().get("verticle"));
+		routingContext.response().setStatusCode(200);
+		routingContext.response().end();
+	}
 
-			@Override
-			public void handle(HttpServerRequest event) {
-				vertx.eventBus().send(EventBus.SINK_CONTROL, false);
-				event.response().setStatusCode(200);
-				event.response().end();
-			}
-		});
-
-		routeMatcher.get("/deploy/map", new Handler<HttpServerRequest>() {
-
-			@Override
-			public void handle(final HttpServerRequest request) {
-				vertx.eventBus().send(EventBus.DEPLOY_MAP, "", new Handler<Message<JsonObject>>() {
-
-					@Override
-					public void handle(Message<JsonObject> event) {
-						request.response().setChunked(true);
-						request.response().setStatusCode(200);
-						request.response().write(event.body().toString());
-						request.response().end();
-					}
-				});
-
-			}
-		});
-
-		routeMatcher.get("/deploy/:verticle", new Handler<HttpServerRequest>() {
-
-			@Override
-			public void handle(HttpServerRequest event) {
-				vertx.eventBus().send(EventBus.DEPLOY_DEPLOY, event.params().get("verticle"));
-				event.response().setStatusCode(200);
-				event.response().end();
-			}
-		});
-
-		routeMatcher.get("/undeploy/:verticle", new Handler<HttpServerRequest>() {
-
-			@Override
-			public void handle(HttpServerRequest event) {
-				vertx.eventBus().send(EventBus.DEPLOY_UNDEPLOY, event.params().get("verticle"));
-				event.response().setStatusCode(200);
-				event.response().end();
-			}
-		});
-
-		server.requestHandler(routeMatcher);
-		server.listen(8080, "localhost");
+	private void undeploy(RoutingContext routingContext) {
+		vertx.eventBus().send(EventBus.DEPLOY_UNDEPLOY, routingContext.request().params().get("verticle"));
+		routingContext.response().setStatusCode(200);
+		routingContext.response().end();
 	}
 
 }

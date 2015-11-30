@@ -12,12 +12,16 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.vertx.java.core.Future;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.platform.Verticle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class JmsProducerVerticle extends Verticle {
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.json.JsonObject;
+
+public class JmsProducerVerticle extends AbstractVerticle {
+
+	private static final Logger LOG = LoggerFactory.getLogger(JmsProducerVerticle.class);
 
 	private static AtomicLong CNT = new AtomicLong();
 
@@ -34,29 +38,24 @@ public class JmsProducerVerticle extends Verticle {
 			final MessageProducer producer = session.createProducer(destination);
 			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
-			vertx.setPeriodic(TimeUnit.SECONDS.toMillis(5), new Handler<Long>() {
-
-				@Override
-				public void handle(Long event) {
-					try {
-						TextMessage message = session.createTextMessage();
-						JsonObject jsonObject = new JsonObject();
-						jsonObject.putString("key", String.format("%10d", CNT.getAndIncrement()));
-						jsonObject.putString("ts", Long.toString(System.currentTimeMillis()));
-						message.setText(jsonObject.toString());
-						producer.send(message);
-						container.logger().info("Sent " + message + " to JMS");
-					} catch (JMSException e) {
-						container.logger().error(e);
-					}
+			vertx.setPeriodic(TimeUnit.SECONDS.toMillis(5), time -> {
+				try {
+					TextMessage message = session.createTextMessage();
+					JsonObject jsonObject = new JsonObject();
+					jsonObject.put("key", String.format("%10d", CNT.getAndIncrement()));
+					jsonObject.put("ts", Long.toString(System.currentTimeMillis()));
+					message.setText(jsonObject.toString());
+					producer.send(message);
+					LOG.info("Sent " + message + " to JMS");
+				} catch (JMSException e) {
+					LOG.error("E", e);
 				}
 			});
-
+			startedResult.complete();
+			LOG.info("Started");
 		} catch (JMSException e) {
-			startedResult.setFailure(e);
+			startedResult.fail(e);
 		}
-		container.logger().info("Started");
-		startedResult.setResult(null);
 	}
 
 }
