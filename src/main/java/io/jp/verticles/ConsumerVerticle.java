@@ -24,13 +24,15 @@ public class ConsumerVerticle extends AbstractVerticle {
 	private void startConsuming() {
 		if (periodicTimerId == NOT_RUNNING) {
 			periodicTimerId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(1), event -> {
-				JsonObject payload = new JsonObject()
-						.put("key", Long.toString(CNT.getAndIncrement()))
-						.put("val", "foobar");
-				vertx.eventBus().send(EventBus.HBASE_PUT, payload);
-				LOG.info("Sent {}", payload);
+				vertx.eventBus().send(EventBus.HBASE_PUT, nextMessage());
 			});
 		}
+	}
+
+	private JsonObject nextMessage() {
+		return new JsonObject()
+				.put("key", Long.toString(CNT.getAndIncrement()))
+				.put("val", "foobar");
 	}
 
 	private void stopConsuming() {

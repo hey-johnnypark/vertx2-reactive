@@ -1,9 +1,7 @@
 package io.jp.verticles;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -25,15 +23,6 @@ public class DeployVerticle extends AbstractVerticle {
 
 	private Map<String, Object> deployMap = new HashMap<>();
 
-	private static URL[] CLASSES;
-
-	static {
-		try {
-			CLASSES = new URL[] { new File(".", "target/classes").getCanonicalFile().toURL() };
-		} catch (Exception e) {
-		}
-	}
-
 	public class DeployHandler implements Handler<AsyncResult<String>> {
 
 		private String verticle;
@@ -47,7 +36,6 @@ public class DeployVerticle extends AbstractVerticle {
 			if (event.succeeded()) {
 				LOG.info("Deployed verticle {}", verticle);
 				deployMap.put(event.result(), verticle);
-				
 			} else {
 				LOG.error("While deploying verticle", event.cause());
 			}
