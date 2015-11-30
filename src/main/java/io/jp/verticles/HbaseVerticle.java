@@ -1,4 +1,4 @@
-package io.jp;
+package io.jp.verticles;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +18,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.jp.EventBus;
 import io.jp.message.State;
 import io.jp.message.StateMessage;
 import io.vertx.core.AbstractVerticle;

@@ -1,4 +1,4 @@
-package io.jp;
+package io.jp.verticles;
 
 import javax.jms.Connection;
 import javax.jms.Destination;
@@ -11,6 +11,8 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.jp.EventBus;
+import io.jp.handlers.AcknowledgeReplyHandler;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonObject;

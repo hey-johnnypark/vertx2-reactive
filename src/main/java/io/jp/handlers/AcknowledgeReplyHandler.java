@@ -1,4 +1,4 @@
-package io.jp;
+package io.jp.handlers;
 
 import java.util.Objects;
 

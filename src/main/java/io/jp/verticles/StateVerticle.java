@@ -1,4 +1,4 @@
-package io.jp;
+package io.jp.verticles;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,8 +7,10 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.jp.EventBus;
 import io.jp.message.State;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 
 public class StateVerticle extends AbstractVerticle {
@@ -24,10 +26,7 @@ public class StateVerticle extends AbstractVerticle {
 	}
 
 	private void initPeriodicalStateCheck() {
-		vertx.setPeriodic(TimeUnit.SECONDS.toMillis(5), time -> {
-			LOG.info("States are {}", states);
-			checkStates();
-		});
+		vertx.setPeriodic(TimeUnit.SECONDS.toMillis(5), time -> checkStates());
 	}
 
 	private void checkStates() {
@@ -41,12 +40,13 @@ public class StateVerticle extends AbstractVerticle {
 	}
 
 	private void registerStateBus() {
-		vertx.eventBus().consumer("state", event -> {
-			JsonObject json = (JsonObject) event.body();
-			LOG.info("Received StateMessage: " + json);
-			states.put(json.getInteger("id"), State.byName(json.getString("state")));
-			checkStates();
-		});
+		vertx.eventBus().consumer("state", this::handleState);
+	}
+
+	private void handleState(Message<JsonObject> event) {
+		LOG.info("Received StateMessage: " + event.body());
+		states.put(event.body().getInteger("id"), State.byName(event.body().getString("state")));
+		checkStates();
 	}
 
 }

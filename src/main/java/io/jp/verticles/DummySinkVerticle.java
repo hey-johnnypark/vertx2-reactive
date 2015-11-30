@@ -1,10 +1,11 @@
-package io.jp;
+package io.jp.verticles;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.jp.EventBus;
 import io.jp.message.State;
 import io.jp.message.StateMessage;
 import io.vertx.core.AbstractVerticle;

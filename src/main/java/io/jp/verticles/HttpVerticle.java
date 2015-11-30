@@ -1,5 +1,6 @@
-package io.jp;
+package io.jp.verticles;
 
+import io.jp.EventBus;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;

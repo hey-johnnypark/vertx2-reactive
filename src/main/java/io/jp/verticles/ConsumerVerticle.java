@@ -1,4 +1,4 @@
-package io.jp;
+package io.jp.verticles;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.jp.EventBus;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonObject;
 
