@@ -1,5 +1,7 @@
 package io.jp.verticles;
 
+import java.util.concurrent.TimeUnit;
+
 import javax.jms.Connection;
 import javax.jms.Destination;
 import javax.jms.Message;
@@ -19,50 +21,85 @@ import io.vertx.core.json.JsonObject;
 
 public class JmsConsumerVerticle extends AbstractVerticle {
 
-	private static final Logger LOG = LoggerFactory.getLogger(JmsConsumerVerticle.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JmsConsumerVerticle.class);
 
-	private Connection connection;
+    private Connection connection;
 
-	@Override
-	public void start(Future<Void> startedResult) {
-		try {
-			ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory("tcp://localhost:61616");
-			connection = connectionFactory.createConnection();
+    @Override
+    public void start(Future<Void> startedResult) {
+        try {
+            ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory("tcp://localhost:61616");
+            connection = connectionFactory.createConnection();
 
-			Session session = connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
-			Destination destination = session.createQueue("foobar");
-			MessageConsumer consumer = session.createConsumer(destination);
+            Session session = connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
+            Destination destination = session.createQueue("foobar");
+            MessageConsumer consumer = session.createConsumer(destination);
 
-			consumer.setMessageListener(jmsMessage -> {
-				try {
-					if (jmsMessage instanceof TextMessage) {
-						JsonObject payload = new JsonObject(((TextMessage) jmsMessage).getText());
-						vertx.eventBus().send(EventBus.HBASE_PUT, payload, ackHandler(jmsMessage));
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			});
+            consumer.setMessageListener(jmsMessage -> {
+                try {
+                    if (jmsMessage instanceof TextMessage) {
+                        LOG.info("Received {}", jmsMessage);
+                        JsonObject payload = new JsonObject(((TextMessage) jmsMessage).getText());
+                        vertx.eventBus().send(EventBus.SINK_DATA, payload, ackHandler(jmsMessage));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
 
-			connection.start();
-		} catch (Exception e) {
-			startedResult.fail(e);
-		}
-		LOG.info("Started");
-		startedResult.complete();
-	}
+            connection.start();
+        } catch (Exception e) {
+            startedResult.fail(e);
+        }
 
-	@Override
-	public void stop() {
-		try {
-			connection.close();
-		} catch (Exception e) {
-			LOG.error("E", e);
-		}
-	}
+        vertx.eventBus().consumer(EventBus.CONSUMER_CONTROL, msg -> {
+            LOG.info("Received control info: {}", msg.body());
+            if ((boolean) msg.body()) {
+                startConsuming();
+                
+                
+                
+                
+                
+            } else {
+                stopConsuming();
+            }
 
-	private AcknowledgeReplyHandler ackHandler(Message message) {
-		return new AcknowledgeReplyHandler(message);
-	}
+        });
+
+        LOG.info("Started");
+        startedResult.complete();
+    }
+
+    @Override
+    public void stop() {
+        try {
+            connection.close();
+        } catch (Exception e) {
+            LOG.error("E", e);
+        }
+    }
+
+    private AcknowledgeReplyHandler ackHandler(Message message) {
+        return new AcknowledgeReplyHandler(message);
+    }
+    
+    private void startConsuming() {
+        try {
+            connection.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void stopConsuming() {
+        try {
+            connection.stop();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 
 }

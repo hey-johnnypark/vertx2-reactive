@@ -32,6 +32,7 @@ public class DummySinkVerticle extends AbstractVerticle {
 		final Handler<Message<String>> handler = event -> {
 			try {
 				sink(event.body());
+				event.reply("");
 			} catch (RuntimeException e) {
 				LOG.info("Exception: ", e);
 				sendState(State.OFFLINE);
@@ -53,7 +54,7 @@ public class DummySinkVerticle extends AbstractVerticle {
 		vertx.eventBus().send("state", new StateMessage().withId(instanceId).withState(state));
 	}
 
-	private void sink(String message) {
+	private void sink(Object message) {
 		if (works) {
 			LOG.info("{} -> Sent message to sink: {}", Thread.currentThread(), message);
 		} else {
